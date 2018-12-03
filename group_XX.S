@@ -9,13 +9,13 @@
 	INTERLETTER_GAP = 4 * TICKS_PER_SEC / 5   ; 700ms
 
 	DECISION_LIMIT = TICKS_PER_SEC / 5 ; 200ms
-	TIMEOUT = 2 * TICKS_PER_SEC / 5	   ; 400ms
+	TIMEOUT = 4 * TICKS_PER_SEC / 5	   ; 400ms
 
 
 ;;; just including the standard symbol definitions of all ports:
 #define __SFR_OFFSET 0
 #include <avr/io.h>
-#include "7segment.S"
+#include "letters.S"
 	
 
 ;;; user code starts from here, as init.S ends with jmp main:
@@ -66,6 +66,8 @@ main:
 	clr r19			; reset overflow flag to defined state
 
 	sei			; enable interrupts globally.
+	ldi r16, STANDBY
+	out PORTD, r16
 
 wait:
 	rjmp wait 		; do nothing :-) just wait for the

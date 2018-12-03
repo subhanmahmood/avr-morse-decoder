@@ -5,8 +5,10 @@
 ;;; TODO
 #define __SFR_OFFSET 0
 	#include <avr/io.h>
-	#include "7segment.S"
+	#include "letters.S"
 
+
+	; Constants being set
     CPU_FREQ = 16000000
 	TICKS_PER_SEC = CPU_FREQ / (256 * 1024)
 
@@ -45,16 +47,16 @@ awaiting_release:
 awaiting_press:	
 	;; if we are waiting for a button press, then more time than
 	;; TIME-OUT has elasped since the last release -- in this case
-	;; we switch on the yellow led and the other off.
-				; off, pull-up for button stays on.
-	ldi r18, 0
-	ldi r20, 0
-    ldi r16, ALL_SEGS
+	;; we output the standby pattern to the display
+    ldi r16, STANDBY
 	out PORTD, r16
 	
 1:	pop r16
 	out SREG, r16 		; restore status register
 	pop r16
+
+	ldi r18, 0
+	ldi r20, 0
 	
 	reti
 
@@ -115,9 +117,8 @@ timer1_cpt_isr:
 
 	
 pressed:
-	;; call depressed ; more code to exexcute, perhaps for the coursework?
-	ori r17, _BV(ICES1)	; next time detect positive edge, ie a
-				; button release.
+	
+	ori r17, _BV(ICES1)	
 
 end_isr:
 	sts TCCR1B, r17 	; write r17 to TCCR1B to activate the
@@ -148,28 +149,31 @@ released:
 				; press in any case
 
 	;; is the signal longer then DECISION_LIMIT?
+
 	ldi r16, DECISION_LIMIT
 	cp r8,r16
 	brcs short_press		; if it is shorter jump to label short
+
+
 	
 long_press:
-	inc r18
-	lsl r20
-	inc r20
-	ldi r16, CHAR_T | _BV(BUTTON)
+	inc r18			;increment r18 to keep track of length of pattern
+	lsl r20			;logically shift bit pattern in r20 to the left
+	inc r20			;increment bit pattern in r20 to represent a dash
 	rjmp 1f
 
 short_press:
-	inc r18
-	lsl r20
-	ldi r16, CHAR_E | _BV(BUTTON)			; 0 for dot
+	inc r18			;increment r18 to keep track of length of pattern
+	lsl r20			;logically shift bit pattern in r20 to the left
 
-1:	out PORTD, r16		; switch on new LED.
-	
+1:		
 	pop r16
 	clr r19			; clear overflow flag in case it was set
 
-	cpi r18, 1
+	;compare value in r18 and branch to respective 
+	;subroutine for letters of that length
+
+	cpi r18, 1		
 	breq length_1
 
 	cpi r18, 2
@@ -181,6 +185,8 @@ short_press:
 	cpi r18, 4
 	breq length_4
 
+	;check if value in r18 is greater than 5 and display error
+	;pattern if so
 	cpi r18, 5
 	brge error
 	ret
@@ -190,6 +196,11 @@ error:
 	out PORTD, r16
 	ret
 
+;subroutines for all lengths
+;each subroutine goes through, loading the letter pattern into r16
+;comparing the bit pattern in r20
+;to the letter's bit pattern decimal equivalent
+;if they are equal, branch to the display_letter subroutine
 length_1:
 	ldi r16, CHAR_E
 	cpi r20, 0
@@ -198,6 +209,9 @@ length_1:
 	ldi r16, CHAR_T
 	cpi r20, 1
 	breq display_letter2
+
+	ldi r16, ERROR
+	rjmp display_letter
 
 	ret
 
@@ -218,10 +232,15 @@ length_2:
 	cpi r20, 3
 	breq display_letter2
 
+	ldi r16, ERROR
+	rjmp display_letter
+
 	ret
 
+;this subroutine is included as a workaround to a limitation of the AVR architecture
+;the breq instruction can only branch a maximum of +/-64 words
 display_letter2:
-	out PORTD, r16
+	out PORTD, r16			;output the value to portd
 	ret
 
 length_3:
@@ -256,6 +275,9 @@ length_3:
 	ldi r16, CHAR_O
 	cpi r20, 7
 	breq display_letter
+
+	ldi r16, ERROR
+	rjmp display_letter
 
 	ret
 
@@ -308,9 +330,12 @@ length_4:
 	cpi r20, 13
 	breq display_letter
 
+	ldi r16, ERROR
+	rjmp display_letter
+
 	ret
 
-
+;subroutine to display pattern in r16 to display
 display_letter:
 	out PORTD, r16
 	ret
